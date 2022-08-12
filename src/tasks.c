@@ -817,6 +817,7 @@ static void prvAddNewTaskToReadyList( TCB_t *pxNewTCB ) PRIVILEGED_FUNCTION;
 
 		if( pxNewTCB != NULL )
 		{
+
 			#if( tskSTATIC_AND_DYNAMIC_ALLOCATION_POSSIBLE != 0 ) /*lint !e9029 !e731 Macro has been consolidated for readability reasons. */
 			{
 				/* Tasks can be created statically or dynamically, so note this
@@ -826,6 +827,10 @@ static void prvAddNewTaskToReadyList( TCB_t *pxNewTCB ) PRIVILEGED_FUNCTION;
 			#endif /* tskSTATIC_AND_DYNAMIC_ALLOCATION_POSSIBLE */
 
 			prvInitialiseNewTask( pxTaskCode, pcName, ( uint32_t ) usStackDepth, pvParameters, uxPriority, pxCreatedTask, pxNewTCB, NULL );
+			#if ( configUSE_EDF_SCHEDULER == 1 )
+			pxNewTCB->xTaskPeriod = period;
+			listSET_LIST_ITEM_VALUE( &( ( pxNewTCB )->xStateListItem ), (pxNewTCB)->xTaskPeriod + xTaskGetTickCount());
+			#endif
 			prvAddNewTaskToReadyList( pxNewTCB );
 			xReturn = pdPASS;
 		}
@@ -833,12 +838,6 @@ static void prvAddNewTaskToReadyList( TCB_t *pxNewTCB ) PRIVILEGED_FUNCTION;
 		{
 			xReturn = errCOULD_NOT_ALLOCATE_REQUIRED_MEMORY;
 		}
-
-#if ( configUSE_EDF_SCHEDULER == 1 )
-		pxNewTCB->xTaskPeriod = period;
-		listSET_LIST_ITEM_VALUE( &( ( pxNewTCB )->xStateListItem ), (pxNewTCB)->xTaskPeriod + xTaskGetTickCount());
-		prvAddTaskToReadyList( pxNewTCB );
-#endif
 
 		return xReturn;
 	}
@@ -2739,6 +2738,9 @@ BaseType_t xTaskIncrementTick( void )
 TCB_t * pxTCB;
 TickType_t xItemValue;
 BaseType_t xSwitchRequired = pdFALSE;
+TickType_t curr;
+TickType_t period;
+TickType_t deadline;
 
 	/* Called by the portable layer each time a tick interrupt occurs.
 	Increments the tick then checks to see if the new tick value will cause any
@@ -2822,7 +2824,11 @@ BaseType_t xSwitchRequired = pdFALSE;
 					/* Place the unblocked task into the appropriate ready
 					list. */
 					#if ( configUSE_EDF_SCHEDULER == 1 )
-					listSET_LIST_ITEM_VALUE( &( ( pxTCB )->xStateListItem ), (pxTCB)->xTaskPeriod + xTaskGetTickCount());
+					curr = xTaskGetTickCount();
+					period = (pxTCB)->xTaskPeriod;
+					deadline = curr + period;
+					
+					listSET_LIST_ITEM_VALUE( &( ( pxTCB )->xStateListItem ), deadline);
 					prvAddTaskToReadyList( pxTCB );
 					
 					/* A task being unblocked cannot cause an immediate
