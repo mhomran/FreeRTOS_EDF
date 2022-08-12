@@ -2821,6 +2821,28 @@ BaseType_t xSwitchRequired = pdFALSE;
 
 					/* Place the unblocked task into the appropriate ready
 					list. */
+					#if ( configUSE_EDF_SCHEDULER == 1 )
+					listSET_LIST_ITEM_VALUE( &( ( pxTCB )->xStateListItem ), (pxTCB)->xTaskPeriod + xTaskGetTickCount());
+					prvAddTaskToReadyList( pxTCB );
+					
+					/* A task being unblocked cannot cause an immediate
+					context switch if preemption is turned off. */
+					#if (  configUSE_PREEMPTION == 1 )
+					{
+						/* Modify preemption way as any task with sooner 
+						deadline must preempt task with larger deadline 
+						instead of priority */
+						if(listGET_LIST_ITEM_VALUE( &( pxTCB->xStateListItem ) ) < listGET_LIST_ITEM_VALUE( &( pxCurrentTCB->xStateListItem ) ) )
+						{
+							xSwitchRequired = pdTRUE;
+						}
+						else
+						{
+							mtCOVERAGE_TEST_MARKER();
+						}
+					}
+					#endif /* configUSE_PREEMPTION */
+					#else /* configUSE_EDF_SCHEDULER */
 					prvAddTaskToReadyList( pxTCB );
 
 					/* A task being unblocked cannot cause an immediate
@@ -2841,6 +2863,8 @@ BaseType_t xSwitchRequired = pdFALSE;
 						}
 					}
 					#endif /* configUSE_PREEMPTION */
+					#endif /* configUSE_EDF_SCHEDULER */
+					
 				}
 			}
 		}
@@ -3445,6 +3469,10 @@ static portTASK_FUNCTION( prvIdleTask, pvParameters )
 
 	for( ;; )
 	{
+#if ( configUSE_EDF_SCHEDULER == 1 )
+		/* Make it the least priority */
+		listSET_LIST_ITEM_VALUE( &( ( xIdleTaskHandle )->xStateListItem ), (xIdleTaskHandle)->xTaskPeriod + xTaskGetTickCount());
+#endif
 		/* See if any tasks have deleted themselves - if so then the idle task
 		is responsible for freeing the deleted task's TCB and stack. */
 		prvCheckTasksWaitingTermination();
