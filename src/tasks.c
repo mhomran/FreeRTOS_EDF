@@ -215,11 +215,16 @@ count overflows. */
  * Place the task represented by pxTCB into the appropriate ready list for
  * the task.  It is inserted at the end of the list.
  */
+#if configUSE_EDF_SCHEDULER == 0 /* E.C. : */
 #define prvAddTaskToReadyList( pxTCB )																\
 	traceMOVED_TASK_TO_READY_STATE( pxTCB );														\
 	taskRECORD_READY_PRIORITY( ( pxTCB )->uxPriority );												\
 	vListInsertEnd( &( pxReadyTasksLists[ ( pxTCB )->uxPriority ] ), &( ( pxTCB )->xStateListItem ) ); \
 	tracePOST_MOVED_TASK_TO_READY_STATE( pxTCB )
+#else
+#define prvAddTaskToReadyList( pxTCB ) /*xGenericListIteam must contain the deadline value */ \
+	vListInsert( &(xReadyTasksListEDF), &( ( pxTCB )->xStateListItem ) )
+#endif
 /*-----------------------------------------------------------*/
 
 /*
@@ -326,6 +331,10 @@ typedef struct tskTaskControlBlock 			/* The old naming convention is used to pr
 		int iTaskErrno;
 	#endif
 
+	#if ( configUSE_EDF_SCHEDULER == 1 )
+		TickType_t xTaskPeriod; /*< Stores the period in tick of the task. > */
+	#endif
+
 } tskTCB;
 
 /* The old tskTCB name is maintained above then typedefed to the new TCB_t name
@@ -346,6 +355,11 @@ PRIVILEGED_DATA static List_t xDelayedTaskList2;						/*< Delayed tasks (two lis
 PRIVILEGED_DATA static List_t * volatile pxDelayedTaskList;				/*< Points to the delayed task list currently being used. */
 PRIVILEGED_DATA static List_t * volatile pxOverflowDelayedTaskList;		/*< Points to the delayed task list currently being used to hold tasks that have overflowed the current tick count. */
 PRIVILEGED_DATA static List_t xPendingReadyList;						/*< Tasks that have been readied while the scheduler was suspended.  They will be moved to the ready list when the scheduler is resumed. */
+
+/* E.C. : the new RedyList */
+#if ( configUSE_EDF_SCHEDULER == 1 )
+PRIVILEGED_DATA static List_t xReadyTasksListEDF; /*< Ready tasks ordered by their deadline. */
+#endif
 
 #if( INCLUDE_vTaskDelete == 1 )
 
@@ -735,7 +749,12 @@ static void prvAddNewTaskToReadyList( TCB_t *pxNewTCB ) PRIVILEGED_FUNCTION;
 							const configSTACK_DEPTH_TYPE usStackDepth,
 							void * const pvParameters,
 							UBaseType_t uxPriority,
-							TaskHandle_t * const pxCreatedTask )
+#if ( configUSE_EDF_SCHEDULER == 1 )
+							TaskHandle_t * const pxCreatedTask,
+							TickType_t period) 
+#else
+							TaskHandle_t * const pxCreatedTask) 
+#endif
 	{
 	TCB_t *pxNewTCB;
 	BaseType_t xReturn;
@@ -814,6 +833,12 @@ static void prvAddNewTaskToReadyList( TCB_t *pxNewTCB ) PRIVILEGED_FUNCTION;
 		{
 			xReturn = errCOULD_NOT_ALLOCATE_REQUIRED_MEMORY;
 		}
+
+#if ( configUSE_EDF_SCHEDULER == 1 )
+		pxNewTCB->xTaskPeriod = period;
+		listSET_LIST_ITEM_VALUE( &( ( pxNewTCB )->xStateListItem ), (pxNewTCB)->xTaskPeriod + xTaskGetTickCount());
+		prvAddTaskToReadyList( pxNewTCB );
+#endif
 
 		return xReturn;
 	}
@@ -2011,7 +2036,12 @@ BaseType_t xReturn;
 								configMINIMAL_STACK_SIZE,
 								( void * ) NULL,
 								portPRIVILEGE_BIT, /* In effect ( tskIDLE_PRIORITY | portPRIVILEGE_BIT ), but tskIDLE_PRIORITY is zero. */
-								&xIdleTaskHandle ); /*lint !e961 MISRA exception, justified as it is not a redundant explicit cast to all supported compilers. */
+								#if ( configUSE_EDF_SCHEDULER == 1 )
+								&xIdleTaskHandle, 
+								(TickType_t)10000000); //period
+								#else
+								&xIdleTaskHandle); 
+								#endif
 	}
 	#endif /* configSUPPORT_STATIC_ALLOCATION */
 
@@ -3038,7 +3068,18 @@ void vTaskSwitchContext( void )
 
 		/* Select a new task to run using either the generic C or port
 		optimised asm code. */
-		taskSELECT_HIGHEST_PRIORITY_TASK(); /*lint !e9079 void * is used as this macro is used with timers and co-routines too.  Alignment is known to be fine as the type of the pointer stored and retrieved is the same. */
+		
+		/* E.C. : */
+		#if (configUSE_EDF_SCHEDULER == 0)
+		{
+			taskSELECT_HIGHEST_PRIORITY_TASK(); /*lint !e9079 void * is used as this macro is used with timers and co-routines too.  Alignment is known to be fine as the type of the pointer stored and retrieved is the same. */
+		}
+		#else
+		{
+			pxCurrentTCB = (TCB_t * ) listGET_OWNER_OF_HEAD_ENTRY(&(xReadyTasksListEDF));
+		}
+		#endif
+
 		traceTASK_SWITCHED_IN();
 
 		/* After the new task is switched in, update the global errno. */
@@ -3628,6 +3669,12 @@ UBaseType_t uxPriority;
 		vListInitialise( &xSuspendedTaskList );
 	}
 	#endif /* INCLUDE_vTaskSuspend */
+
+	#if ( configUSE_EDF_SCHEDULER == 1 )
+	{
+		vListInitialise( &xReadyTasksListEDF );
+	}
+	#endif
 
 	/* Start with pxDelayedTaskList using list1 and the pxOverflowDelayedTaskList
 	using list2. */

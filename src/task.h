@@ -332,7 +332,12 @@ is used in assert() statements. */
 							const configSTACK_DEPTH_TYPE usStackDepth,
 							void * const pvParameters,
 							UBaseType_t uxPriority,
-							TaskHandle_t * const pxCreatedTask ) PRIVILEGED_FUNCTION;
+							#if ( configUSE_EDF_SCHEDULER == 1 )
+							TaskHandle_t * const pxCreatedTask,
+							TickType_t period) PRIVILEGED_FUNCTION;
+							#else
+							TaskHandle_t * const pxCreatedTask) PRIVILEGED_FUNCTION;
+							#endif
 #endif
 
 /**
