@@ -44,7 +44,7 @@
 
 #define configUSE_PREEMPTION		1
 #define configUSE_IDLE_HOOK			0
-#define configUSE_TICK_HOOK			0
+#define configUSE_TICK_HOOK			1
 #define configCPU_CLOCK_HZ			( ( unsigned long ) 60000000 )	/* =12.0MHz xtal multiplied by 5 using the PLL. */
 #define configTICK_RATE_HZ			( ( TickType_t ) 1000 )
 #define configMAX_PRIORITIES		( 4 )
@@ -57,6 +57,87 @@
 #define configUSE_EDF_SCHEDULER   1
 
 #define configQUEUE_REGISTRY_SIZE 	0
+#define configUSE_APPLICATION_TASK_TAG 1
+
+#define traceTASK_SWITCHED_OUT() \
+CurrentTime = T1TC; \
+if(pxCurrentTCB->pxTaskTag == (void*)1) \
+{ \
+	GPIO_write(PORT_1, PIN1, PIN_IS_LOW); \
+} \
+else if(pxCurrentTCB->pxTaskTag == (void*)2) \
+{ \
+	GPIO_write(PORT_0, PIN0, PIN_IS_LOW); \
+	Button_1_time += CurrentTime - Button_1_in_time; \
+} \
+else if(pxCurrentTCB->pxTaskTag == (void*)3) \
+{ \
+	GPIO_write(PORT_0, PIN1, PIN_IS_LOW); \
+	Button_2_time += CurrentTime - Button_2_in_time; \
+} \
+else if(pxCurrentTCB->pxTaskTag == (void*)4) \
+{ \
+	GPIO_write(PORT_0, PIN2, PIN_IS_LOW); \
+	Periodic_Transmitter_time += CurrentTime - Periodic_Transmitter_in_time; \
+} \
+else if(pxCurrentTCB->pxTaskTag == (void*)5) \
+{ \
+	GPIO_write(PORT_0, PIN3, PIN_IS_LOW); \
+	Uart_Receiver_time += CurrentTime - Uart_Receiver_in_time; \
+} \
+else if(pxCurrentTCB->pxTaskTag == (void*)6) \
+{ \
+	GPIO_write(PORT_0, PIN4, PIN_IS_LOW); \
+	Load_1_Simulation_time += CurrentTime - Load_1_Simulation_in_time; \
+} \
+else if(pxCurrentTCB->pxTaskTag == (void*)7) \
+{ \
+	GPIO_write(PORT_0, PIN5, PIN_IS_LOW); \
+	Load_2_Simulation_time += CurrentTime - Load_2_Simulation_in_time; \
+} \
+SystemTime = CurrentTime; \
+CPU_Load = ((Button_1_time + Button_2_time + Periodic_Transmitter_time \
++ Uart_Receiver_time + Load_1_Simulation_time + Load_2_Simulation_time) \
+* 100) / SystemTime ;
+
+
+#define traceTASK_SWITCHED_IN()	\
+CurrentTime = T1TC; \
+if(pxCurrentTCB->pxTaskTag == (void*)1) \
+{ \
+	GPIO_write(PORT_1, PIN1, PIN_IS_HIGH); \
+} \
+else if(pxCurrentTCB->pxTaskTag == (void*)2) \
+{ \
+	GPIO_write(PORT_0, PIN0, PIN_IS_HIGH); \
+	Button_1_in_time = CurrentTime; \
+} \
+else if(pxCurrentTCB->pxTaskTag == (void*)3) \
+{ \
+	GPIO_write(PORT_0, PIN1, PIN_IS_HIGH); \
+	Button_2_in_time = CurrentTime; \
+} \
+else if(pxCurrentTCB->pxTaskTag == (void*)4) \
+{ \
+	GPIO_write(PORT_0, PIN2, PIN_IS_HIGH); \
+	Periodic_Transmitter_in_time = CurrentTime; \
+} \
+else if(pxCurrentTCB->pxTaskTag == (void*)5) \
+{ \
+	GPIO_write(PORT_0, PIN3, PIN_IS_HIGH); \
+	Uart_Receiver_in_time = CurrentTime; \
+} \
+else if(pxCurrentTCB->pxTaskTag == (void*)6) \
+{ \
+	GPIO_write(PORT_0, PIN4, PIN_IS_HIGH); \
+	Load_1_Simulation_in_time = CurrentTime; \
+} \
+else if(pxCurrentTCB->pxTaskTag == (void*)7) \
+{ \
+	GPIO_write(PORT_0, PIN5, PIN_IS_HIGH); \
+	Load_2_Simulation_in_time = CurrentTime; \
+} \
+
 
 /* Co-routine definitions. */
 #define configUSE_CO_ROUTINES 		0

@@ -100,6 +100,17 @@ const char Btn1Released[] = "Btn1 Released\n\r";
 const char Btn2Pressed[] = "Btn2 Pressed\n";
 const char Btn2Released[] = "Btn2 Released\n";
 
+
+uint32_t Button_1_in_time, Button_1_time;
+uint32_t Button_2_in_time, Button_2_time;
+uint32_t Periodic_Transmitter_in_time, Periodic_Transmitter_time;
+uint32_t Uart_Receiver_in_time, Uart_Receiver_time;
+uint32_t Load_1_Simulation_in_time, Load_1_Simulation_time;
+uint32_t Load_2_Simulation_in_time, Load_2_Simulation_time;
+uint32_t CurrentTime, SystemTime, CPU_Load;
+
+uint32_t misses;
+
 /*
  * Configure the processor for use with the Keil demo board.  This is very
  * minimal as most of the setup is managed by the settings in the project
@@ -114,6 +125,8 @@ void Periodic_Transmitter( void * pvParameters );
 void Uart_Receiver( void * pvParameters );
 void Load_1_Simulation( void * pvParameters );
 void Load_2_Simulation( void * pvParameters );
+void vApplicationTickHook( void );
+void vApplicationIdleHook( void );
 
 /*
  * Application entry point:
@@ -224,15 +237,19 @@ int main( void )
 void Button_1_Monitor( void * pvParameters )
 {
 	static uint8_t state = RELEASED_STATE;
+	static uint32_t start_time, end_time;
 	pinState_t level;
 	int i;
 	TickType_t xLastWakeTime;
 	const TickType_t period =  BUTTON_1_MONITOR_P / portTICK_PERIOD_MS;
+	
 	xLastWakeTime = xTaskGetTickCount();
-
+	vTaskSetApplicationTaskTag(NULL, (void*)2);
+	
 	
 	for( ;; )
 	{
+		start_time = xTaskGetTickCount();
 		level = GPIO_read(PORT_0, PIN6);
 		if (state == RELEASED_STATE && level == PIN_IS_HIGH) {
 			for(i = 0; i < strlen(Btn1Pressed); i++)
@@ -247,25 +264,33 @@ void Button_1_Monitor( void * pvParameters )
 			}
 			state = RELEASED_STATE;
 		}
+		end_time = xTaskGetTickCount();
+		if((end_time - start_time) > BUTTON_1_MONITOR_P)
+		{
+			misses++;
+		}
 		
-		GPIO_write(PORT_0, PIN0, PIN_IS_LOW);
-		vTaskDelayUntil( &xLastWakeTime, period );
-		GPIO_write(PORT_0, PIN0, PIN_IS_HIGH);
+		vTaskDelayUntil( &xLastWakeTime, period);
 	}
 }
 
 void Button_2_Monitor( void * pvParameters )
 {
 	static uint8_t state = RELEASED_STATE;
+	static uint32_t start_time, end_time;
+	
 	pinState_t level;
 	int i;
 	
 	TickType_t xLastWakeTime;
 	const TickType_t period =  BUTTON_2_MONITOR_P / portTICK_PERIOD_MS;
 	xLastWakeTime = xTaskGetTickCount();
-	
+	vTaskSetApplicationTaskTag(NULL, (void*)3);
+
 	for( ;; )
 	{
+		start_time = xTaskGetTickCount();
+
 		level = GPIO_read(PORT_0, PIN7);
 		if (state == RELEASED_STATE && level == PIN_IS_HIGH) {
 			for(i = 0; i < strlen(Btn2Pressed); i++)
@@ -280,96 +305,128 @@ void Button_2_Monitor( void * pvParameters )
 			}
 			state = RELEASED_STATE;
 		}
-
-		GPIO_write(PORT_0, PIN1, PIN_IS_LOW);
+		end_time = xTaskGetTickCount();
+		if((end_time - start_time) > BUTTON_2_MONITOR_P)
+		{
+			misses++;
+		}
 		vTaskDelayUntil( &xLastWakeTime, period );
-		GPIO_write(PORT_0, PIN1, PIN_IS_HIGH);
 	}
 }
 
 void Periodic_Transmitter( void * pvParameters )
 {
+	static uint32_t start_time, end_time;
+	
 	TickType_t xLastWakeTime;
 	const TickType_t period =  PERIODIC_TRANSMITTER_P / portTICK_PERIOD_MS;
 	int i;
 	
 	xLastWakeTime = xTaskGetTickCount();
-	
+	vTaskSetApplicationTaskTag(NULL, (void*)4);
+
 	for( ;; )
 	{
-		
+		start_time = xTaskGetTickCount();
+
 		for(i = 0; i < strlen(HelloCmd); i++)
 			{
 				xQueueSend(Queue1, &HelloCmd[i], 0);
 			}
+			
+		end_time = xTaskGetTickCount();
+		if((end_time - start_time) > PERIODIC_TRANSMITTER_P)
+		{
+			misses++;
+		}
 		
-		GPIO_write(PORT_0, PIN2, PIN_IS_LOW);
 		vTaskDelayUntil( &xLastWakeTime, period );
-		GPIO_write(PORT_0, PIN2, PIN_IS_HIGH);
 	}
 }
 
 void Uart_Receiver( void * pvParameters )
 {
+	static uint32_t start_time, end_time;
 	TickType_t xLastWakeTime;
 	const TickType_t period =  UART_RECEIVER_P / portTICK_PERIOD_MS;
 	uint8_t rx;
 
 	xLastWakeTime = xTaskGetTickCount();
-	
+	vTaskSetApplicationTaskTag(NULL, (void*)5);
+
 	for( ;; )
 	{
+		start_time = xTaskGetTickCount();
+
 		// Print any new messages from Queue 1
 		while(xQueueReceive(Queue1, &rx, 0) == pdTRUE)
 		{
 			xSerialPutChar((signed char)rx);
 		}
-
-		GPIO_write(PORT_0, PIN3, PIN_IS_LOW);
+		end_time = xTaskGetTickCount();
+		if((end_time - start_time) > UART_RECEIVER_P)
+		{
+			misses++;
+		}
 		vTaskDelayUntil( &xLastWakeTime, period );
-		GPIO_write(PORT_0, PIN3, PIN_IS_HIGH);
 	}
 }
 
 void Load_1_Simulation( void * pvParameters )
 {
+	static uint32_t start_time, end_time;
+
 	TickType_t xLastWakeTime;
 	const TickType_t period =  LOAD_1_SIMULATION_P / portTICK_PERIOD_MS;
 	int i;
 	
 	xLastWakeTime = xTaskGetTickCount();
-	
+	vTaskSetApplicationTaskTag(NULL, (void*)6);
+
 	for( ;; )
 	{
-		for(i = 0; i < 5700; i++) {
-			GPIO_write(PORT_0, PIN4, PIN_IS_HIGH);
+		start_time = xTaskGetTickCount();
+
+		for(i = 0; i < 37000; i++);
+		end_time = xTaskGetTickCount();
+		if((end_time - start_time) > LOAD_1_SIMULATION_P)
+		{
+			misses++;
 		}
-		
-		GPIO_write(PORT_0, PIN4, PIN_IS_LOW);
 		vTaskDelayUntil( &xLastWakeTime, period );
-		GPIO_write(PORT_0, PIN5, PIN_IS_LOW);
 	}
 }
 
 void Load_2_Simulation( void * pvParameters )
 {
+	static uint32_t start_time, end_time;
+
 	TickType_t xLastWakeTime;
 	const TickType_t period =  LOAD_2_SIMULATION_P / portTICK_PERIOD_MS;
 	int i;
 	
 	xLastWakeTime = xTaskGetTickCount();
-	
+	vTaskSetApplicationTaskTag(NULL, (void*)7);
+
 	for( ;; )
 	{
-		for(i = 0; i < 14400; i++) {
-			GPIO_write(PORT_0, PIN5, PIN_IS_HIGH);
+		start_time = xTaskGetTickCount();
+		for(i = 0; i < 85000; i++);
+		end_time = xTaskGetTickCount();
+		if((end_time - start_time) > LOAD_2_SIMULATION_P)
+		{
+			misses++;
 		}
-		
-		GPIO_write(PORT_0, PIN5, PIN_IS_LOW);
 		vTaskDelayUntil( &xLastWakeTime, period );
-		GPIO_write(PORT_0, PIN4, PIN_IS_LOW);
 	}
 }
+
+void vApplicationTickHook( void )
+{
+	GPIO_write(PORT_1, PIN0, PIN_IS_HIGH);
+	GPIO_write(PORT_1, PIN0, PIN_IS_LOW);
+}
+
 
 /* Function to reset timer 1 */
 void timer1Reset(void)

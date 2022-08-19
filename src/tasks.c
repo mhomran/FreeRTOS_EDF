@@ -40,6 +40,9 @@ task.h is included from an application file. */
 #include "timers.h"
 #include "stack_macros.h"
 
+/* Peripherals Includes */
+#include "gpio.h"
+
 /* Lint e9021, e961 and e750 are suppressed as a MISRA exception justified
 because the MPU ports require MPU_WRAPPERS_INCLUDED_FROM_API_FILE to be defined
 for the header files above, but not in this file, in order to generate the
@@ -355,6 +358,14 @@ PRIVILEGED_DATA static List_t xDelayedTaskList2;						/*< Delayed tasks (two lis
 PRIVILEGED_DATA static List_t * volatile pxDelayedTaskList;				/*< Points to the delayed task list currently being used. */
 PRIVILEGED_DATA static List_t * volatile pxOverflowDelayedTaskList;		/*< Points to the delayed task list currently being used to hold tasks that have overflowed the current tick count. */
 PRIVILEGED_DATA static List_t xPendingReadyList;						/*< Tasks that have been readied while the scheduler was suspended.  They will be moved to the ready list when the scheduler is resumed. */
+
+extern uint32_t Button_1_in_time, Button_1_time;
+extern uint32_t Button_2_in_time, Button_2_time;
+extern uint32_t Periodic_Transmitter_in_time, Periodic_Transmitter_time;
+extern uint32_t Uart_Receiver_in_time, Uart_Receiver_time;
+extern uint32_t Load_1_Simulation_in_time, Load_1_Simulation_time;
+extern uint32_t Load_2_Simulation_in_time, Load_2_Simulation_time;
+extern uint32_t CurrentTime, SystemTime, CPU_Load;
 
 /* E.C. : the new RedyList */
 #if ( configUSE_EDF_SCHEDULER == 1 )
@@ -3472,6 +3483,7 @@ static portTASK_FUNCTION( prvIdleTask, pvParameters )
 	the idle task is responsible for deleting the task's secure context, if
 	any. */
 	portALLOCATE_SECURE_CONTEXT( configMINIMAL_SECURE_STACK_SIZE );
+	vTaskSetApplicationTaskTag(NULL, (void*)1);
 
 	for( ;; )
 	{
